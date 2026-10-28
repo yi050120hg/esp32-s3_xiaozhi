@@ -57,24 +57,25 @@
 
 ### 新增 / 修改文件一览
 
-**新增模块**（`main/` 下）：
+**新增自研模块**：
 | 文件 | 作用 |
 |---|---|
-| `plant_monitor.h/.cc` | 植物数据引擎：虚拟土壤湿度/光照、自动养护阈值、环形养护日志 |
-| `bemfa_cloud.h/.cc` | 巴法云 TCP 客户端：订阅/发布/心跳/断线重连/DNS 重试 |
-| `dht11_sensor.h/.cc` | DHT11 温湿度传感器（虚拟数据 + MCP 工具） |
-| `led_ctrl.h/.cc` | GPIO10 LED 控制（浇水/补光状态指示） |
+| `main/plant_monitor.h / .cc` | 植物数据引擎：土壤湿度 / 光照虚拟模型、自动养护阈值、环形养护日志 |
+| `main/bemfa_cloud.h / .cc` | 巴法云 TCP 客户端：订阅/发布/60 秒心跳/断线重连/DNS 重试 |
+| `main/dht11_sensor.h / .cc` | DHT11 温湿度传感器，数据接入 MCP 工具链 |
+| `main/led_ctrl.h / .cc` | GPIO10 LED 状态指示（浇水 / 补光） |
 
-**修改的原有文件**（面试官一眼区分改动）：
+**修改的原有框架文件**：
 | 文件 | 改动内容 |
 |---|---|
-| `main/application.cc` | 启动时初始化新模块、主循环 Tick() 数据刷新、巴法云任务挂载到 `StartNetwork()` 之后、MCP 工具注册 |
+| `main/application.cc` | 启动时初始化新模块；主事件循环每秒 Tick() 刷新数据；巴法云任务挂载于 `StartNetwork()` 之后；MCP 工具注册 |
 | `main/application.h` | 新增 `PlantMonitor` / `Dht11Sensor` / `led_ctrl` / `BemfaCloud` 成员 |
 | `main/display/display.h` | 新增 `ShowPlantDashboard()` / `ShowChatScreen()` / `UpdatePlantDashboard()` 虚接口 |
-| `main/display/lcd_display.h/.cc` | 实现深绿主题看板 UI、触摸切换、循环滚动状态文本 |
-| `main/mcp_server.cc` | 注册 7 个绿植 MCP 工具 |
+| `main/display/lcd_display.h / .cc` | 实现深绿主题看板 UI、触摸切换、循环滚动状态文本 |
+| `main/mcp_server.cc` | 注册 7 个绿植专属 MCP 工具 |
 | `main/boards/gec-esp32s3-board/gec_esp32s3_board.cc` | 启用触摸初始化 |
 | `main/CMakeLists.txt` | SOURCES 列表追加新模块 |
+| `.github/workflows/build.yml` | CI 容器镜像升级到 IDF v5.5（与本地编译环境一致） |
 
 ### 构建 / 烧录（Windows + ESP-IDF 5.5.3）
 
