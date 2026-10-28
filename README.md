@@ -37,6 +37,66 @@
 - 通过设备端 MCP 实现设备控制（音量、灯光、电机、GPIO 等）
 - 通过云端 MCP 扩展大模型能力（智能家居控制、PC桌面操作、知识搜索、邮件收发等）
 
+## 🌱 植语 — 基于小智 AI 的智能绿植养护二次开发
+
+> 本项目基于 **xiaozhi-esp32 v1.9.4** 开源框架二次开发，面向 ESP32-S3 粤嵌（GEC）开发板，
+> 构建了一个名为 **「植语（PlantTalk）」** 的 AI 语音交互智能绿植养护系统。
+> 核心定位：让用户用**自然语言**（或触摸）管理家里的绿植，由 AI 自动或远程完成浇水、补光等养护动作。
+
+### 新增功能
+
+1. **植物数据看板 + AI 聊天双界面**（LVGL v9）
+   - 深绿主题 2×2 卡片看板：土壤湿度 / 光照 / 温度 / 湿度实时显示
+   - 触摸全屏点击、或语音唤醒词，双通道在"看板 ↔ 聊天"之间互切
+   - 养护状态自动循环滚动（`LV_LABEL_LONG_MODE_SCROLL_CIRCULAR`）
+2. **自动养护闭环**：土壤湿度 < 20% 自动浇水、光照 < 15% 自动补光，30 秒冷却防振荡
+3. **MCP 协议设备侧工具链**：新增 7 个绿植专属 MCP 工具（浇水/补光/状态查询/历史/自动养护开关/演示设值/健康检查），AI 可直接调用硬件能力
+4. **巴法云远程 TCP 控制**（bemfa.com:8344）：支持 HTTP 指令码（1=上报/2=浇水/3=补光）、60 秒心跳、断线重连、自动丢弃回显消息防止循环浇水
+5. **摄像头 AI 健康诊断**：GC0308 传感器 + PCA9557 I²C 电源扩展，单次拍照 JPEG 上传服务器
+6. **养护日志环形缓冲**（20 条，来源标签：语音调用 / 自动触发 / 远程触发）
+
+### 新增 / 修改文件一览
+
+**新增模块**（`main/` 下）：
+| 文件 | 作用 |
+|---|---|
+| `plant_monitor.h/.cc` | 植物数据引擎：虚拟土壤湿度/光照、自动养护阈值、环形养护日志 |
+| `bemfa_cloud.h/.cc` | 巴法云 TCP 客户端：订阅/发布/心跳/断线重连/DNS 重试 |
+| `dht11_sensor.h/.cc` | DHT11 温湿度传感器（虚拟数据 + MCP 工具） |
+| `led_ctrl.h/.cc` | GPIO10 LED 控制（浇水/补光状态指示） |
+
+**修改的原有文件**（面试官一眼区分改动）：
+| 文件 | 改动内容 |
+|---|---|
+| `main/application.cc` | 启动时初始化新模块、主循环 Tick() 数据刷新、巴法云任务挂载到 `StartNetwork()` 之后、MCP 工具注册 |
+| `main/application.h` | 新增 `PlantMonitor` / `Dht11Sensor` / `led_ctrl` / `BemfaCloud` 成员 |
+| `main/display/display.h` | 新增 `ShowPlantDashboard()` / `ShowChatScreen()` / `UpdatePlantDashboard()` 虚接口 |
+| `main/display/lcd_display.h/.cc` | 实现深绿主题看板 UI、触摸切换、循环滚动状态文本 |
+| `main/mcp_server.cc` | 注册 7 个绿植 MCP 工具 |
+| `main/boards/gec-esp32s3-board/gec_esp32s3_board.cc` | 启用触摸初始化 |
+| `main/CMakeLists.txt` | SOURCES 列表追加新模块 |
+
+### 构建 / 烧录（Windows + ESP-IDF 5.5.3）
+
+```powershell
+# 首次需安装 IDF（v5.5.3，5.4+ 以上均可，实测 5.5.3 稳定）
+$env:IDF_TOOLS_PATH='D:\ESP32\EspressifV5.5.3\tools'
+& 'D:\ESP32\EspressifV5.5.3\frameworks\esp-idf-v5.5.3\export.ps1'
+
+idf.py -p COM14 flash monitor
+```
+
+### 关键约束 & 踩坑记录
+
+1. **TCP/IP 协议栈必须先于网络客户端初始化**：`BemfaCloud::Start()` 必须在 `board.StartNetwork()` 之后，否则 lwIP `tcpip_send_msg_wait_sem (Invalid mbox)` 断言触发 → 设备无限重启
+2. **PSRAM 必开**：摄像头帧缓冲依赖 PSRAM，关闭即 Crash
+3. **`CONFIG_LIBC_NEWLIB_NANO_FORMAT=y` 下 `%f` 不可用**：看板更新用 `std::ostringstream oss << std::fixed << std::setprecision(1)` 转浮点
+4. **巴法云回显循环浇水**：设备发布到 `status` 主题的状态消息会被巴法云回显回来，回显含"土壤湿度:"标记，`HandleLine()` 据此识别丢弃，防止关键词匹配误判为指令
+
+> 更详细的架构说明、模块内部设计、MCP 工具注册清单、自动养护策略、LVGL 多线程安全规范、常见坑的完整复现与修复，请见 [docs/plantalk/README.md](docs/plantalk/README.md)。
+
+---
+
 ## 硬件
 
 ### 面包板手工制作实践
